@@ -22,60 +22,69 @@ app.add_middleware(
 # Chess game logic
 board = chess.Board()
 
+
 class MoveRequest(BaseModel):
     source: str
     target: str
     promotion: str = None  # Optional promotion piece (e.g., 'q' for queen)
 
+
 class MoveResponse(BaseModel):
     valid: bool
     board: str
     status: str
-    game_over: bool = False
     winner: str = None  # 'white', 'black', or 'draw'
     reset: bool = False  # Signal to reset the game
+    request_promotion: bool = False  # To indicate a promotion is needed
+    promotion_piece: str = None  # To ask for the piece during promotion (if applicable)
+
 
 @app.post("/make-move", response_model=MoveResponse)
 async def make_move(move: MoveRequest):
     global board  # Ensure we are modifying the global board object
-    
-    try:
-        move_obj = chess.Move.from_uci(f"{move.source}{move.target}")
 
-        # Check if the move is legal
-        if move_obj in board.legal_moves:
+    try:
+        print("hi")
+        if move.promotion:
+            print("yo yo promotion")
+            move_obj = chess.Move.from_uci(
+                f"{move.source}{move.target}{move.promotion}"
+            )
+        else:
+            move_obj = chess.Move.from_uci(f"{move.source}{move.target}")
             # If the piece being moved is a pawn and reaches the last rank, handle promotion
             piece = board.piece_at(move_obj.from_square)
-            if piece == chess.PAWN:
-                if move_obj.from_square // 8 == 6 and move_obj.to_square // 8 == 7:  # Player's pawn reaching 8th rank
-                    if move.promotion:
-                        # Apply the promotion based on the piece selected by the player
-                        move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion=move.promotion)
-                    else:
-                        # Ask for promotion (this will be handled in the frontend)
+            print(piece.symbol(), type(piece.symbol()))
+            if piece.symbol() == "P":
+                print("it is pawn")
+                if (
+                    move_obj.from_square // 8 == 6 and move_obj.to_square // 8 == 7
+                ):  # Player's pawn reaching 8th rank
+                    # Pawn reaches last rank, ask for promotion
+                    print("wtf")
+                    move_obj = chess.Move.from_uci(f"{move.source}{move.target}q")
+                    if move_obj in board.legal_moves:
+                        print("requesting promotion")
                         return MoveResponse(
                             valid=True,
                             board=board.fen(),
                             status="Pawn promotion! Choose a piece (q/r/b/n).",
                             request_promotion=True,
-                            promotion_piece=None
                         )
-                elif move_obj.from_square // 8 == 1 and move_obj.to_square // 8 == 0:  # AI's pawn reaching 1st rank
-                    # Pawn reaches last rank, promote to Queen (AI's automatic promotion)
-                    move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion='q')  # Promote to Queen
 
+        # Check if the move is legal
+        if move_obj in board.legal_moves:
             # Apply the move to the board
             board.push(move_obj)
-            
+
             # Check if the game is over after the player's move
             if board.is_checkmate():
                 response = MoveResponse(
                     valid=True,
                     board=board.fen(),
                     status="Checkmate! Player wins.",
-                    game_over=True,
                     winner="player",
-                    reset=True  # Indicate that the game should reset
+                    reset=True,  # Indicate that the game should reset
                 )
                 board = chess.Board()  # Reset the board for the next game
                 return response
@@ -84,9 +93,8 @@ async def make_move(move: MoveRequest):
                     valid=True,
                     board=board.fen(),
                     status="Stalemate! It's a draw.",
-                    game_over=True,
                     winner="draw",
-                    reset=True  # Indicate that the game should reset
+                    reset=True,  # Indicate that the game should reset
                 )
                 board = chess.Board()  # Reset the board for the next game
                 return response
@@ -94,15 +102,9 @@ async def make_move(move: MoveRequest):
                 status = "AI's turn (Check)"
             else:
                 status = "AI's turn"
-            
+
             # AI makes a move (for simplicity, random move)
             ai_move = random.choice(list(board.legal_moves))
-            
-            # If the AI's pawn reaches the last row, promote it
-            ai_piece = board.piece_at(ai_move.from_square)
-            if ai_piece == chess.PAWN:
-                if ai_move.from_square // 8 == 1 and ai_move.to_square // 8 == 0:  # AI's pawn moves to 1st rank
-                    ai_move = chess.Move(ai_move.from_square, ai_move.to_square, promotion='q')  # Promote to Queen
 
             board.push(ai_move)
 
@@ -112,9 +114,8 @@ async def make_move(move: MoveRequest):
                     valid=True,
                     board=board.fen(),
                     status="Checkmate! AI wins.",
-                    game_over=True,
                     winner="ai",
-                    reset=True  # Indicate that the game should reset
+                    reset=True,  # Indicate that the game should reset
                 )
                 board = chess.Board()  # Reset the board for the next game
                 return response
@@ -123,9 +124,8 @@ async def make_move(move: MoveRequest):
                     valid=True,
                     board=board.fen(),
                     status="Stalemate! It's a draw.",
-                    game_over=True,
                     winner="draw",
-                    reset=True  # Indicate that the game should reset
+                    reset=True,  # Indicate that the game should reset
                 )
                 board = chess.Board()  # Reset the board for the next game
                 return response
@@ -134,21 +134,9 @@ async def make_move(move: MoveRequest):
             else:
                 status = "Player's turn"
 
-            return MoveResponse(
-                valid=True,
-                board=board.fen(),
-                status=status
-            )
+            return MoveResponse(valid=True, board=board.fen(), status=status)
         else:
-            return MoveResponse(
-                valid=False,
-                board=board.fen(),
-                status="Player's turn"
-            )
+            return MoveResponse(valid=False, board=board.fen(), status="Player's turn")
     except Exception as e:
         print(f"Error: {e}")
-        return MoveResponse(
-            valid=False,
-            board=board.fen(),
-            status="Player's turn"
-        )
+        return MoveResponse(valid=False, board=board.fen(), status="Player's turn")

@@ -75,6 +75,7 @@
         pieceTheme: "./img/chesspieces/uscf/{piece}.png",
         onDrop: handleMove,
       });
+      let moveData = {NaN, NaN};
 
       const statusElement = document.getElementById("status");
       let waitingForPromotion = false; // Flag to indicate if promotion is needed
@@ -85,7 +86,7 @@
           return; // Don't allow moves while waiting for promotion
         }
 
-        const moveData = { source, target };
+        moveData = { source, target };
 
         try {
           const response = await fetch("http://127.0.0.1:8000/make-move", {
@@ -101,12 +102,15 @@
           if (result.request_promotion === true) {
             waitingForPromotion = true; // Enable promotion selection
             showPromotionDialog(); // Show the promotion dialog
-            return; // Stop here, wait for promotion input
+            return
           }
 
           if (result.reset) {
-            board.start(); // Resets the chessboard to the initial position
-            statusElement.innerText = "Status: New Game";
+            statusElement.innerText = result.status + "Click anywhere on board to replay";
+            window.addEventListener('click', ()=>{
+              board.start(); // Resets the chessboard to the initial position
+              statusElement.innerText = "Status: New Game";
+            })
             return;
           }
 
@@ -144,7 +148,7 @@
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              promotion: piece,
+              promotion: piece, ...moveData
             }),
           });
 
