@@ -1,12 +1,25 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chess
-import chess.engine
 import random
 
 app = FastAPI()
 
-# Initialize chess board
+# CORS configuration: Allow requests from localhost:5500 (your frontend)
+origins = [
+    "http://127.0.0.1:5500",  # Allow your frontend to access the backend
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # The list of allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
+
+# Chess game logic
 board = chess.Board()
 
 class MoveRequest(BaseModel):
@@ -20,21 +33,20 @@ class MoveResponse(BaseModel):
 
 @app.post("/make-move", response_model=MoveResponse)
 async def make_move(move: MoveRequest):
-    # Attempt to make the player's move
     try:
         move_obj = chess.Move.from_uci(f"{move.source}{move.target}")
         if move_obj in board.legal_moves:
             board.push(move_obj)
             status = "AI's turn"
             
-            # AI's move (this is a simple random AI, replace with a more sophisticated AI if needed)
+            # AI makes a move (for simplicity, random move)
             ai_move = random.choice(list(board.legal_moves))
             board.push(ai_move)
             status = "Player's turn"
             
             return MoveResponse(
                 valid=True,
-                board=board.fen(),  # Send the updated board in FEN format
+                board=board.fen(),  # FEN representation of the board
                 status=status
             )
         else:
@@ -44,7 +56,7 @@ async def make_move(move: MoveRequest):
                 status="Player's turn"
             )
     except Exception as e:
-        print(f"Error processing move: {e}")
+        print(f"Error: {e}")
         return MoveResponse(
             valid=False,
             board=board.fen(),
