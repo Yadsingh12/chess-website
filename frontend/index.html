@@ -1,80 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chess Game</title>
-    <!-- Include jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-    <!-- Include Chessboard.js CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
-    />
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin: 0;
-        padding: 20px;
-        background-color: #f4f4f9;
-      }
-      #board {
-        margin: 20px;
-      }
-      #status {
-        margin-top: 10px;
-        font-size: 1.2rem;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Chess Game</h1>
-    <div id="board" style="width: 400px"></div>
-    <div id="status">Status: Player's turn</div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess Game</title>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f9;
+    }
+    #board {
+      margin: 20px;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chess Game</h1>
+  <div id="board" style="width: 400px;"></div>
+  <div id="status">Status: Player's turn</div>
 
-    <!-- Include Chessboard.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-    <script>
-      const board = Chessboard("board", {
-        draggable: true,
-        position: "start",
-        pieceTheme: "./img/chesspieces/wikipedia/{piece}.png",
-        onDrop: handleMove,
-      });
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <script>
+    const board = Chessboard('board', {
+      draggable: true,
+      position: 'start',
+      pieceTheme: './img/chesspieces/uscf/{piece}.png',
+      onDrop: handleMove
+    });
 
-      const statusElement = document.getElementById("status");
+    const statusElement = document.getElementById('status');
 
-      async function handleMove(source, target) {
-        // Send move to the backend
-        const moveData = { source, target };
-        try {
-          const response = await fetch("http://127.0.0.1:8000/make-move", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(moveData),
-          });
+    async function handleMove(source, target) {
+      const moveData = { source, target };
+      try {
+        const response = await fetch('http://127.0.0.1:8000/make-move', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(moveData),
+        });
 
-          const result = await response.json();
+        const result = await response.json();
 
-          if (result.valid) {
-            // Update board with AI's move
-            board.position(result.board);
-            statusElement.innerText = `Status: ${result.status}`;
-          } else {
-            // Revert move if invalid
-            board.position(result.board);
-            alert("Invalid move!");
-          }
-        } catch (error) {
-          console.error("Error communicating with backend:", error);
-          alert("Failed to communicate with backend.");
+        if (result.reset) {
+          // Reset the board if the game is over
+          board.start();  // Resets the chessboard to the initial position
+          statusElement.innerText = 'Status: New Game';
+          return;
         }
+
+        if (result.valid) {
+          board.position(result.board);
+          statusElement.innerText = `Status: ${result.status}`;
+        } else {
+          board.position(result.board);
+          alert('Invalid move!');
+        }
+      } catch (error) {
+        console.error('Error communicating with backend:', error);
+        alert('Failed to communicate with backend.');
       }
-    </script>
-  </body>
+    }
+  </script>
+</body>
 </html>
