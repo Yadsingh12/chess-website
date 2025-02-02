@@ -74,5 +74,40 @@
       }
     }
   </script>
-</body>
+</body>async function handleMove(source, target) {
+    const moveData = { source, target };
+    
+    // Check if the move is a pawn reaching the last row
+    const isPawnPromotion = (source[1] === '7' && target[1] === '8') || (source[1] === '2' && target[1] === '1');
+    if (isPawnPromotion) {
+      const promotion = prompt("Promote to (q for Queen, r for Rook, b for Bishop, n for Knight):");
+      if (promotion) {
+        moveData.promotion = promotion;
+      }
+    }
+  
+    try {
+      const response = await fetch('http://127.0.0.1:8000/make-move', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(moveData),
+      });
+  
+      const result = await response.json();
+  
+      if (result.valid) {
+        board.position(result.board);
+        statusElement.innerText = `Status: ${result.status}`;
+      } else {
+        board.position(result.board);
+        alert('Invalid move!');
+      }
+    } catch (error) {
+      console.error('Error communicating with backend:', error);
+      alert('Failed to communicate with backend.');
+    }
+  }
+  
 </html>
