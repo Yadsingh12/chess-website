@@ -1,113 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chess Game</title>
-  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 0;
-      padding: 20px;
-      background-color: #f4f4f9;
-    }
-    #board {
-      margin: 20px;
-    }
-    #status {
-      margin-top: 10px;
-      font-size: 1.2rem;
-    }
-  </style>
-</head>
-<body>
-  <h1>Chess Game</h1>
-  <div id="board" style="width: 400px;"></div>
-  <div id="status">Status: Player's turn</div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-  <script>
-    const board = Chessboard('board', {
-      draggable: true,
-      position: 'start',
-      pieceTheme: './img/chesspieces/uscf/{piece}.png',
-      onDrop: handleMove
-    });
-
-    const statusElement = document.getElementById('status');
-
-    async function handleMove(source, target) {
-      const moveData = { source, target };
-      try {
-        const response = await fetch('http://127.0.0.1:8000/make-move', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(moveData),
-        });
-
-        const result = await response.json();
-
-        if (result.reset) {
-          // Reset the board if the game is over
-          board.start();  // Resets the chessboard to the initial position
-          statusElement.innerText = 'Status: New Game';
-          return;
-        }
-
-        if (result.valid) {
-          board.position(result.board);
-          statusElement.innerText = `Status: ${result.status}`;
-        } else {
-          board.position(result.board);
-          alert('Invalid move!');
-        }
-      } catch (error) {
-        console.error('Error communicating with backend:', error);
-        alert('Failed to communicate with backend.');
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Game</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f4f9;
       }
-    }
-  </script>
-</body>async function handleMove(source, target) {
-    const moveData = { source, target };
-    
-    // Check if the move is a pawn reaching the last row
-    const isPawnPromotion = (source[1] === '7' && target[1] === '8') || (source[1] === '2' && target[1] === '1');
-    if (isPawnPromotion) {
-      const promotion = prompt("Promote to (q for Queen, r for Rook, b for Bishop, n for Knight):");
-      if (promotion) {
-        moveData.promotion = promotion;
+      #board {
+        margin: 20px;
       }
-    }
-  
-    try {
-      const response = await fetch('http://127.0.0.1:8000/make-move', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(moveData),
+      #status {
+        margin-top: 10px;
+        font-size: 1.2rem;
+      }
+      #promotion-dialog {
+        display: none;
+        background-color: white;
+        padding: 20px;
+        border: 1px solid #ccc;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+      }
+      #promotion-dialog button {
+        margin: 5px;
+      }
+      #overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Chess Game</h1>
+    <div id="board" style="width: 400px"></div>
+    <div id="status">Status: Player's turn</div>
+
+    <!-- Overlay and Promotion Dialog -->
+    <div id="overlay"></div>
+    <div id="promotion-dialog">
+      <h3>Select Promotion Piece</h3>
+      <button onclick="selectPromotion('q')">Queen</button>
+      <button onclick="selectPromotion('r')">Rook</button>
+      <button onclick="selectPromotion('b')">Bishop</button>
+      <button onclick="selectPromotion('n')">Knight</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script>
+      const board = Chessboard("board", {
+        draggable: true,
+        position: "start",
+        pieceTheme: "./img/chesspieces/uscf/{piece}.png",
+        onDrop: handleMove,
       });
-  
-      const result = await response.json();
-  
-      if (result.valid) {
-        board.position(result.board);
-        statusElement.innerText = `Status: ${result.status}`;
-      } else {
-        board.position(result.board);
-        alert('Invalid move!');
+
+      const statusElement = document.getElementById("status");
+      let waitingForPromotion = false; // Flag to indicate if promotion is needed
+
+      async function handleMove(source, target) {
+        if (waitingForPromotion) {
+          alert("Please select a promotion piece first.");
+          return; // Don't allow moves while waiting for promotion
+        }
+
+        const moveData = { source, target };
+
+        try {
+          const response = await fetch("http://127.0.0.1:8000/make-move", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(moveData),
+          });
+
+          const result = await response.json();
+
+          if (result.request_promotion === true) {
+            waitingForPromotion = true; // Enable promotion selection
+            showPromotionDialog(); // Show the promotion dialog
+            return; // Stop here, wait for promotion input
+          }
+
+          if (result.reset) {
+            board.start(); // Resets the chessboard to the initial position
+            statusElement.innerText = "Status: New Game";
+            return;
+          }
+
+          if (result.valid) {
+            board.position(result.board);
+            statusElement.innerText = `Status: ${result.status}`;
+          } else {
+            board.position(result.board);
+            alert("Invalid move!");
+          }
+        } catch (error) {
+          console.error("Error communicating with backend:", error);
+          alert("Failed to communicate with backend.");
+        }
       }
-    } catch (error) {
-      console.error('Error communicating with backend:', error);
-      alert('Failed to communicate with backend.');
-    }
-  }
-  
+
+      function showPromotionDialog() {
+        // Show the overlay and promotion dialog
+        document.getElementById("overlay").style.display = "block";
+        document.getElementById("promotion-dialog").style.display = "block";
+      }
+
+      function hidePromotionDialog() {
+        // Hide the overlay and promotion dialog
+        document.getElementById("overlay").style.display = "none";
+        document.getElementById("promotion-dialog").style.display = "none";
+      }
+
+      async function selectPromotion(piece) {
+        // Send the selected promotion piece to the backend
+        try {
+          const response = await fetch("http://127.0.0.1:8000/make-move", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              promotion: piece,
+            }),
+          });
+
+          const result = await response.json();
+          waitingForPromotion = false; // Promotion is complete
+
+          hidePromotionDialog(); // Hide the promotion dialog
+
+          if (result.valid) {
+            board.position(result.board);
+            statusElement.innerText = `Status: ${result.status}`;
+          } else {
+            board.position(result.board);
+            alert("Invalid move!");
+          }
+        } catch (error) {
+          console.error("Error sending promotion to backend:", error);
+          alert("Failed to send promotion.");
+        }
+      }
+    </script>
+  </body>
 </html>

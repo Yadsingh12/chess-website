@@ -44,14 +44,27 @@ async def make_move(move: MoveRequest):
 
         # Check if the move is legal
         if move_obj in board.legal_moves:
-            # If the piece being moved is a pawn and reaches the last rank, apply promotion
+            # If the piece being moved is a pawn and reaches the last rank, handle promotion
             piece = board.piece_at(move_obj.from_square)
             if piece == chess.PAWN:
                 if move_obj.from_square // 8 == 6 and move_obj.to_square // 8 == 7:  # Player's pawn reaching 8th rank
-                    move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion='q')  # Promote to Queen
+                    if move.promotion:
+                        # Apply the promotion based on the piece selected by the player
+                        move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion=move.promotion)
+                    else:
+                        # Ask for promotion (this will be handled in the frontend)
+                        return MoveResponse(
+                            valid=True,
+                            board=board.fen(),
+                            status="Pawn promotion! Choose a piece (q/r/b/n).",
+                            request_promotion=True,
+                            promotion_piece=None
+                        )
                 elif move_obj.from_square // 8 == 1 and move_obj.to_square // 8 == 0:  # AI's pawn reaching 1st rank
+                    # Pawn reaches last rank, promote to Queen (AI's automatic promotion)
                     move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion='q')  # Promote to Queen
 
+            # Apply the move to the board
             board.push(move_obj)
             
             # Check if the game is over after the player's move
@@ -120,7 +133,7 @@ async def make_move(move: MoveRequest):
                 status = "Player's turn (Check)"
             else:
                 status = "Player's turn"
-            
+
             return MoveResponse(
                 valid=True,
                 board=board.fen(),
