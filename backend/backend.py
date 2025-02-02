@@ -25,6 +25,7 @@ board = chess.Board()
 class MoveRequest(BaseModel):
     source: str
     target: str
+    promotion: str = None  # Optional promotion piece (e.g., 'q' for queen)
 
 class MoveResponse(BaseModel):
     valid: bool
@@ -40,7 +41,17 @@ async def make_move(move: MoveRequest):
     
     try:
         move_obj = chess.Move.from_uci(f"{move.source}{move.target}")
+
+        # Check if the move is legal
         if move_obj in board.legal_moves:
+            # If the piece being moved is a pawn and reaches the last rank, apply promotion
+            piece = board.piece_at(move_obj.from_square)
+            if piece == chess.PAWN:
+                if move_obj.from_square // 8 == 6 and move_obj.to_square // 8 == 7:  # Player's pawn reaching 8th rank
+                    move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion='q')  # Promote to Queen
+                elif move_obj.from_square // 8 == 1 and move_obj.to_square // 8 == 0:  # AI's pawn reaching 1st rank
+                    move_obj = chess.Move(move_obj.from_square, move_obj.to_square, promotion='q')  # Promote to Queen
+
             board.push(move_obj)
             
             # Check if the game is over after the player's move
@@ -73,6 +84,13 @@ async def make_move(move: MoveRequest):
             
             # AI makes a move (for simplicity, random move)
             ai_move = random.choice(list(board.legal_moves))
+            
+            # If the AI's pawn reaches the last row, promote it
+            ai_piece = board.piece_at(ai_move.from_square)
+            if ai_piece == chess.PAWN:
+                if ai_move.from_square // 8 == 1 and ai_move.to_square // 8 == 0:  # AI's pawn moves to 1st rank
+                    ai_move = chess.Move(ai_move.from_square, ai_move.to_square, promotion='q')  # Promote to Queen
+
             board.push(ai_move)
 
             # Check if the game is over after the AI's move
