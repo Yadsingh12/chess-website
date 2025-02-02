@@ -106,11 +106,12 @@
           }
 
           if (result.reset) {
+            console.log("reset")
             statusElement.innerText = result.status + "Click anywhere on board to replay";
             window.addEventListener('click', ()=>{
               board.start(); // Resets the chessboard to the initial position
               statusElement.innerText = "Status: New Game";
-            })
+            }, { once: true }); // this event listener expires after one click
             return;
           }
 
