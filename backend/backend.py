@@ -30,23 +30,82 @@ class MoveResponse(BaseModel):
     valid: bool
     board: str
     status: str
+    game_over: bool = False
+    winner: str = None  # 'white', 'black', or 'draw'
+    reset: bool = False  # Signal to reset the game
 
 @app.post("/make-move", response_model=MoveResponse)
 async def make_move(move: MoveRequest):
+    global board  # Ensure we are modifying the global board object
+    
     try:
         move_obj = chess.Move.from_uci(f"{move.source}{move.target}")
         if move_obj in board.legal_moves:
             board.push(move_obj)
-            status = "AI's turn"
+            
+            # Check if the game is over after the player's move
+            if board.is_checkmate():
+                response = MoveResponse(
+                    valid=True,
+                    board=board.fen(),
+                    status="Checkmate! Player wins.",
+                    game_over=True,
+                    winner="player",
+                    reset=True  # Indicate that the game should reset
+                )
+                board = chess.Board()  # Reset the board for the next game
+                return response
+            elif board.is_stalemate():
+                response = MoveResponse(
+                    valid=True,
+                    board=board.fen(),
+                    status="Stalemate! It's a draw.",
+                    game_over=True,
+                    winner="draw",
+                    reset=True  # Indicate that the game should reset
+                )
+                board = chess.Board()  # Reset the board for the next game
+                return response
+            elif board.is_check():
+                status = "AI's turn (Check)"
+            else:
+                status = "AI's turn"
             
             # AI makes a move (for simplicity, random move)
             ai_move = random.choice(list(board.legal_moves))
             board.push(ai_move)
-            status = "Player's turn"
+
+            # Check if the game is over after the AI's move
+            if board.is_checkmate():
+                response = MoveResponse(
+                    valid=True,
+                    board=board.fen(),
+                    status="Checkmate! AI wins.",
+                    game_over=True,
+                    winner="ai",
+                    reset=True  # Indicate that the game should reset
+                )
+                board = chess.Board()  # Reset the board for the next game
+                return response
+            elif board.is_stalemate():
+                response = MoveResponse(
+                    valid=True,
+                    board=board.fen(),
+                    status="Stalemate! It's a draw.",
+                    game_over=True,
+                    winner="draw",
+                    reset=True  # Indicate that the game should reset
+                )
+                board = chess.Board()  # Reset the board for the next game
+                return response
+            elif board.is_check():
+                status = "Player's turn (Check)"
+            else:
+                status = "Player's turn"
             
             return MoveResponse(
                 valid=True,
-                board=board.fen(),  # FEN representation of the board
+                board=board.fen(),
                 status=status
             )
         else:
